@@ -31,7 +31,7 @@ def test_model_name_configurable_via_env():
 
     with patch.dict(os.environ, {}, clear=True):
         # Fallback default
-        assert get_gemini_model_name() == "gemini-2.5-flash"
+        assert get_gemini_model_name() == "gemini-3.5-flash"
 
 
 def test_copilot_switch_active_config_resets_chat():

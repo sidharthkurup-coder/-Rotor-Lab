@@ -21,7 +21,7 @@ except ImportError:
     HAS_GENAI_SDK = False
 
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.5-flash"
 
 
 def get_gemini_model_name() -> str:
