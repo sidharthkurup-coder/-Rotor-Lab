@@ -51,6 +51,10 @@ RotorLab/
 
 ## Quickstart & Local Execution (Windows 11)
 
+**Fastest:** double-click `run_rotorlab.bat` (or run its full path from any terminal). It creates the virtual environment on first use and launches the app at http://localhost:8501.
+
+**Manual steps** (commands must be run from inside the RotorLab folder):
+
 1. **Activate the virtual environment** (or create one if setting up fresh):
    ```powershell
    cd "C:\Users\Sidharth V Kurup\.gemini\antigravity\scratch\RotorLab"
