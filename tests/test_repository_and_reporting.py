@@ -40,11 +40,15 @@ def test_sqlite_repository_crud_and_duplication() -> None:
     assert dup.name == "Cloned Surveyor Quad"
     assert len(repo.list_configurations()) == 5
 
-    # Delete configuration
+    # Delete custom duplicated configuration
     deleted = repo.delete_configuration(dup.config_id)
     assert deleted is True
     assert repo.get_configuration(dup.config_id) is None
     assert len(repo.list_configurations()) == 4
+
+    # Built-in presets are protected and cannot be deleted
+    assert repo.delete_configuration(first.config_id) is False
+    assert repo.get_configuration(first.config_id) is not None
 
 
 def test_csv_dataset_import_and_persistence() -> None:

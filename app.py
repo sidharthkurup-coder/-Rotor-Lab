@@ -390,9 +390,11 @@ def _render_kpi_card(label: str, value: str, sub: str, explanation: str) -> None
 
 def main() -> None:
     repo = get_repo()
+    repo.ensure_builtin_presets()
     all_configs = repo.list_configurations()
     all_datasets = repo.list_all_datasets()
     datasets_by_id = {d.dataset_id: d for d in all_datasets}
+    builtin_ids = repo.builtin_preset_ids()
 
     # Initialize session state
     if "active_config_id" not in st.session_state or st.session_state["active_config_id"] not in {
@@ -427,24 +429,32 @@ def main() -> None:
 
         col_s1, col_s2 = st.columns(2)
         with col_s1:
-            if st.button("Duplicate", width="stretch", help="Clone the active configuration for a trade study"):
+            if st.button("Duplicate", width="stretch", help="Create an editable copy of this configuration for what-if trade studies"):
                 dup = repo.duplicate_configuration(active_cfg.config_id)
                 st.session_state["active_config_id"] = dup.config_id
                 st.toast(f"Cloned as '{dup.name}'")
                 st.rerun()
         with col_s2:
-            can_delete = len(all_configs) > 1
+            is_builtin = active_cfg.config_id in builtin_ids
+            can_delete = (not is_builtin) and (len(all_configs) > 1)
             if st.button(
                 "Delete",
                 width="stretch",
                 disabled=not can_delete,
-                help="Remove this configuration from workspace storage",
+                help="Built-in reference presets are protected and cannot be deleted. Only custom or duplicated configurations can be deleted."
+                if is_builtin
+                else "Remove this custom configuration from workspace storage.",
             ):
                 repo.delete_configuration(active_cfg.config_id)
                 remaining = repo.list_configurations()
                 st.session_state["active_config_id"] = remaining[0].config_id
-                st.toast("Configuration removed.")
+                st.toast("Custom configuration removed.")
                 st.rerun()
+
+        if st.button("🔄 Restore Factory Presets", width="stretch", help="Restore all 4 built-in reference UAV configurations to their original specifications"):
+            repo.reset_builtin_presets()
+            st.toast("All 4 factory reference presets restored!")
+            st.rerun()
 
         with st.expander("⚙️ Measurement Units", expanded=False):
             st.caption("Choose your preferred display and input units. Internal equations always execute in SI.")

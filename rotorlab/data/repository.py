@@ -35,7 +35,7 @@ class RotorLabRepository:
         if self._is_memory:
             self._persistent_conn = sqlite3.connect(":memory:", check_same_thread=False)
         self._init_schema()
-        self.seed_defaults_if_empty()
+        self.ensure_builtin_presets()
 
     def _get_conn(self) -> sqlite3.Connection:
         if self._is_memory and self._persistent_conn is not None:
@@ -75,18 +75,33 @@ class RotorLabRepository:
         finally:
             self._close_conn(conn)
 
-    def seed_defaults_if_empty(self) -> None:
-        """Seed the SQLite database with default engineering configurations if none exist."""
+    @staticmethod
+    def builtin_preset_ids() -> set[str]:
+        """Return the set of protected built-in reference configuration IDs."""
+        return {cfg.config_id for cfg in get_default_configurations()}
+
+    def ensure_builtin_presets(self) -> None:
+        """Ensure all 4 built-in reference configurations exist in the database."""
+        existing_ids: set[str] = set()
         conn = self._get_conn()
         try:
-            cursor = conn.execute("SELECT COUNT(*) FROM configurations")
-            count = cursor.fetchone()[0]
+            cursor = conn.execute("SELECT config_id FROM configurations")
+            existing_ids = {row[0] for row in cursor.fetchall()}
         finally:
             self._close_conn(conn)
 
-        if count == 0:
-            for cfg in get_default_configurations():
+        for cfg in get_default_configurations():
+            if cfg.config_id not in existing_ids:
                 self.save_configuration(cfg)
+
+    def reset_builtin_presets(self) -> None:
+        """Restore all 4 built-in reference configurations to their factory specifications."""
+        for cfg in get_default_configurations():
+            self.save_configuration(cfg)
+
+    def seed_defaults_if_empty(self) -> None:
+        """Ensure built-in default engineering configurations are seeded."""
+        self.ensure_builtin_presets()
 
     @staticmethod
     def _serialize_config(cfg: PropulsionConfiguration) -> str:
@@ -181,7 +196,9 @@ class RotorLabRepository:
         return self.save_configuration(dup_cfg)
 
     def delete_configuration(self, config_id: str) -> bool:
-        """Delete a configuration by ID. Returns True if a record was deleted."""
+        """Delete a custom configuration by ID. Built-in reference presets are protected and cannot be deleted."""
+        if config_id in self.builtin_preset_ids():
+            return False
         conn = self._get_conn()
         try:
             with conn:
