@@ -5,6 +5,7 @@ Every chart includes:
 - Legend where relevant.
 - Data-source & provenance footer annotation.
 - Relevant engineering assumptions & operating markers (Hover Equilibrium, Operating Point, Component Limits).
+- Smooth, lightweight transition configuration and responsive layout margins.
 """
 
 from __future__ import annotations
@@ -16,9 +17,9 @@ from plotly.subplots import make_subplots
 
 from rotorlab.services.analyzer import ComparisonRow, CompleteConfigurationAnalysis
 
-# Aerospace dark palette
-BG_COLOR = "#0F172A"
-PLOT_BG_COLOR = "#111827"
+# Refined Aerospace Dark Palette
+BG_COLOR = "#0D1322"
+PLOT_BG_COLOR = "#090D16"
 GRID_COLOR = "#1E293B"
 TEXT_COLOR = "#F8FAFC"
 MUTED_TEXT = "#94A3B8"
@@ -35,30 +36,37 @@ def _apply_aerospace_layout(
     subtitle_provenance: str,
     xaxis_title: str,
     yaxis_title: str,
-    height: int = 410,
+    height: int = 420,
 ) -> go.Figure:
-    """Apply consistent dark-themed aerospace engineering styling with provenance footer."""
+    """Apply consistent dark-themed aerospace engineering styling with provenance footer and smooth transitions."""
     fig.update_layout(
         title=dict(
-            text=f"<b>{title}</b><br><span style='font-size:11px;color:{MUTED_TEXT}'>{subtitle_provenance}</span>",
+            text=(
+                f"<b>{title}</b><br>"
+                f"<span style='font-size:11px;color:{MUTED_TEXT};font-weight:400;'>{subtitle_provenance}</span>"
+            ),
             x=0.01,
             xanchor="left",
-            font=dict(size=15, color=TEXT_COLOR),
+            font=dict(size=14, color=TEXT_COLOR, family="Inter, Segoe UI, system-ui, sans-serif"),
         ),
         paper_bgcolor=BG_COLOR,
         plot_bgcolor=PLOT_BG_COLOR,
-        font=dict(family="Inter, Segoe UI, sans-serif", color=TEXT_COLOR, size=12),
+        font=dict(family="Inter, Segoe UI, system-ui, sans-serif", color=TEXT_COLOR, size=12),
         xaxis=dict(
-            title=xaxis_title,
+            title=dict(text=xaxis_title, font=dict(size=12, color=MUTED_TEXT)),
             gridcolor=GRID_COLOR,
             zerolinecolor=GRID_COLOR,
-            tickfont=dict(color=MUTED_TEXT),
+            tickfont=dict(color=MUTED_TEXT, size=11),
+            showline=True,
+            linecolor=GRID_COLOR,
         ),
         yaxis=dict(
-            title=yaxis_title,
+            title=dict(text=yaxis_title, font=dict(size=12, color=MUTED_TEXT)),
             gridcolor=GRID_COLOR,
             zerolinecolor=GRID_COLOR,
-            tickfont=dict(color=MUTED_TEXT),
+            tickfont=dict(color=MUTED_TEXT, size=11),
+            showline=True,
+            linecolor=GRID_COLOR,
         ),
         legend=dict(
             orientation="h",
@@ -66,12 +74,18 @@ def _apply_aerospace_layout(
             y=1.02,
             xanchor="right",
             x=1.0,
-            bgcolor="rgba(15, 23, 42, 0.7)",
+            bgcolor="rgba(13, 19, 34, 0.85)",
             bordercolor=GRID_COLOR,
             borderwidth=1,
-            font=dict(size=11),
+            font=dict(size=11, color=TEXT_COLOR),
         ),
-        margin=dict(l=55, r=35, t=75, b=55),
+        hoverlabel=dict(
+            bgcolor="#0F172A",
+            bordercolor="#334155",
+            font=dict(family="Inter, Segoe UI, system-ui, sans-serif", size=12, color=TEXT_COLOR),
+        ),
+        transition=dict(duration=240, easing="cubic-in-out"),
+        margin=dict(l=58, r=38, t=78, b=52),
         height=height,
         hovermode="x unified",
     )
@@ -90,7 +104,6 @@ def build_thrust_vs_throttle_chart(analysis: CompleteConfigurationAnalysis) -> g
     total_gf = [num_m * s.thrust_gf for s in analysis.throttle_curve_states]
 
     raw_th = [p.throttle_pct for p in ds.points]
-    raw_single_gf = [p.thrust_gf for p in ds.points]
     raw_total_gf = [num_m * p.thrust_gf for p in ds.points]
 
     fig = go.Figure()
@@ -103,6 +116,8 @@ def build_thrust_vs_throttle_chart(analysis: CompleteConfigurationAnalysis) -> g
             mode="lines",
             name=f"Total Thrust ({num_m} Motors) [gf]",
             line=dict(color=CYAN, width=3),
+            fill="tozeroy",
+            fillcolor="rgba(56, 189, 248, 0.07)",
             hovertemplate="Total: %{y:.0f} gf<extra></extra>",
         )
     )
@@ -151,7 +166,7 @@ def build_thrust_vs_throttle_chart(analysis: CompleteConfigurationAnalysis) -> g
                 y=[tr.aircraft_weight_gf],
                 mode="markers",
                 name=f"Hover Equilibrium ({h_th:.1f}%)",
-                marker=dict(color=AMBER, size=12, symbol="star", line=dict(width=1.5, color="#FFFFFF")),
+                marker=dict(color=AMBER, size=13, symbol="star", line=dict(width=1.5, color="#FFFFFF")),
                 hovertemplate=f"Hover @ {h_th:.1f}% Throttle ({tr.aircraft_weight_gf:.0f} gf)<extra></extra>",
             )
         )
@@ -192,6 +207,8 @@ def build_current_vs_throttle_chart(analysis: CompleteConfigurationAnalysis) -> 
             mode="lines",
             name=f"Total System Current ({num_m} Motors + Avionics) [A]",
             line=dict(color=VIOLET, width=3),
+            fill="tozeroy",
+            fillcolor="rgba(168, 85, 247, 0.06)",
             hovertemplate="System Current: %{y:.2f} A<extra></extra>",
         )
     )
@@ -566,27 +583,35 @@ def build_configuration_comparison_chart(rows: List[ComparisonRow]) -> go.Figure
         title=dict(
             text=(
                 "<b>Multi-Configuration Propulsion Architecture Comparison</b><br>"
-                f"<span style='font-size:11px;color:{MUTED_TEXT}'>"
+                f"<span style='font-size:11px;color:{MUTED_TEXT};font-weight:400;'>"
                 "Source: Active configuration datasets | All forces evaluated in SI units (g = 9.80665 m/s²)"
                 "</span>"
             ),
             x=0.01,
-            font=dict(size=15, color=TEXT_COLOR),
+            font=dict(size=14, color=TEXT_COLOR, family="Inter, Segoe UI, system-ui, sans-serif"),
         ),
         barmode="group",
         paper_bgcolor=BG_COLOR,
         plot_bgcolor=PLOT_BG_COLOR,
-        font=dict(family="Inter, Segoe UI, sans-serif", color=TEXT_COLOR, size=11),
+        font=dict(family="Inter, Segoe UI, system-ui, sans-serif", color=TEXT_COLOR, size=11),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.08,
             xanchor="right",
             x=1.0,
-            bgcolor="rgba(15, 23, 42, 0.7)",
+            bgcolor="rgba(13, 19, 34, 0.85)",
+            bordercolor=GRID_COLOR,
+            borderwidth=1,
         ),
-        margin=dict(l=50, r=30, t=90, b=50),
-        height=430,
+        hoverlabel=dict(
+            bgcolor="#0F172A",
+            bordercolor="#334155",
+            font=dict(family="Inter, Segoe UI, system-ui, sans-serif", size=12, color=TEXT_COLOR),
+        ),
+        transition=dict(duration=240, easing="cubic-in-out"),
+        margin=dict(l=52, r=32, t=92, b=52),
+        height=440,
     )
     fig.update_xaxes(gridcolor=GRID_COLOR, tickfont=dict(color=MUTED_TEXT))
     fig.update_yaxes(gridcolor=GRID_COLOR, tickfont=dict(color=MUTED_TEXT))

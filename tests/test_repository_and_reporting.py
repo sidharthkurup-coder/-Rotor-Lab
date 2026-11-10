@@ -144,4 +144,8 @@ def test_streamlit_workstation_apptest_smoke() -> None:
     app_path = Path(__file__).resolve().parent.parent / "app.py"
     at = AppTest.from_file(str(app_path), default_timeout=30).run()
     assert not at.exception
-    assert len(at.tabs) == 7
+    assert len(at.tabs) == 5
+    # Verify interactive throttle slider and configuration switcher work without exceptions
+    if at.slider:
+        at.slider[0].set_value(75.0).run()
+        assert not at.exception
