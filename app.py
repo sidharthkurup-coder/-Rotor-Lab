@@ -356,9 +356,11 @@ st.markdown(
 )
 
 
-@st.cache_resource
 def get_repo() -> RotorLabRepository:
-    return RotorLabRepository("rotorlab_workspace.db")
+    import importlib
+    import rotorlab.data.repository
+    importlib.reload(rotorlab.data.repository)
+    return rotorlab.data.repository.RotorLabRepository("rotorlab_workspace.db")
 
 
 def _severity_badge_html(sev: SeverityLevel, prefix: str = "") -> str:
@@ -390,11 +392,21 @@ def _render_kpi_card(label: str, value: str, sub: str, explanation: str) -> None
 
 def main() -> None:
     repo = get_repo()
-    repo.ensure_builtin_presets()
+    if hasattr(repo, "ensure_builtin_presets"):
+        repo.ensure_builtin_presets()
     all_configs = repo.list_configurations()
     all_datasets = repo.list_all_datasets()
     datasets_by_id = {d.dataset_id: d for d in all_datasets}
-    builtin_ids = repo.builtin_preset_ids()
+    builtin_ids = (
+        repo.builtin_preset_ids()
+        if hasattr(repo, "builtin_preset_ids")
+        else {
+            "cfg_endurance_quad_4s",
+            "cfg_industrial_u3_quad_4s",
+            "cfg_heavylift_hexa_6s",
+            "cfg_antigravity_quad_6s",
+        }
+    )
 
     # Initialize session state
     if "active_config_id" not in st.session_state or st.session_state["active_config_id"] not in {
@@ -452,7 +464,11 @@ def main() -> None:
                 st.rerun()
 
         if st.button("🔄 Restore Factory Presets", width="stretch", help="Restore all 4 built-in reference UAV configurations to their original specifications"):
-            repo.reset_builtin_presets()
+            if hasattr(repo, "reset_builtin_presets"):
+                repo.reset_builtin_presets()
+            else:
+                for cfg in get_default_configurations():
+                    repo.save_configuration(cfg)
             st.toast("All 4 factory reference presets restored!")
             st.rerun()
 
