@@ -222,14 +222,14 @@ def main() -> None:
 
         col_s1, col_s2 = st.columns(2)
         with col_s1:
-            if st.button("Duplicate", use_container_width=True):
+            if st.button("Duplicate", width="stretch"):
                 dup = repo.duplicate_configuration(active_cfg.config_id)
                 st.session_state["active_config_id"] = dup.config_id
                 st.toast(f"Duplicated as '{dup.name}'")
                 st.rerun()
         with col_s2:
             can_delete = len(all_configs) > 1
-            if st.button("Delete", use_container_width=True, disabled=not can_delete):
+            if st.button("Delete", width="stretch", disabled=not can_delete):
                 repo.delete_configuration(active_cfg.config_id)
                 remaining = repo.list_configurations()
                 st.session_state["active_config_id"] = remaining[0].config_id
@@ -726,11 +726,11 @@ def main() -> None:
             btn_save, btn_save_new = st.columns(2)
             with btn_save:
                 save_clicked = st.form_submit_button(
-                    "💾 Save & Update Active Configuration", use_container_width=True
+                    "💾 Save & Update Active Configuration", width="stretch"
                 )
             with btn_save_new:
                 save_new_clicked = st.form_submit_button(
-                    "➕ Save as New Configuration", use_container_width=True
+                    "➕ Save as New Configuration", width="stretch"
                 )
 
             if save_clicked or save_new_clicked:
@@ -853,7 +853,7 @@ def main() -> None:
                     for p in active_ds.points
                 ]
             )
-            st.dataframe(pts_df, use_container_width=True, hide_index=True)
+            st.dataframe(pts_df, width="stretch", hide_index=True)
 
         with col_ds_import:
             st.markdown("**Import Custom Motor-Propeller Dataset (CSV)**")
@@ -894,7 +894,7 @@ def main() -> None:
             )
             csv_text_area = st.text_area("Or Paste CSV Data Directly", value=default_csv_text, height=130)
 
-            if st.button("📥 Validate & Register Dataset", use_container_width=True):
+            if st.button("📥 Validate & Register Dataset", width="stretch"):
                 raw_csv = (
                     uploaded_csv.getvalue().decode("utf-8")
                     if uploaded_csv is not None
@@ -1099,7 +1099,7 @@ def main() -> None:
             ]
         )
         st.markdown("##### Multi-Regime Electrical & Endurance Breakdown")
-        st.dataframe(elec_df, use_container_width=True, hide_index=True)
+        st.dataframe(elec_df, width="stretch", hide_index=True)
 
         st.markdown("##### Operating Assumptions & Real-World Battery Physics")
         for assumption in el.assumptions:
@@ -1152,17 +1152,17 @@ def main() -> None:
 
         ch_r1_c1, ch_r1_c2 = st.columns(2)
         with ch_r1_c1:
-            st.plotly_chart(build_thrust_vs_throttle_chart(analysis), use_container_width=True)
+            st.plotly_chart(build_thrust_vs_throttle_chart(analysis), width="stretch")
         with ch_r1_c2:
-            st.plotly_chart(build_current_vs_throttle_chart(analysis), use_container_width=True)
+            st.plotly_chart(build_current_vs_throttle_chart(analysis), width="stretch")
 
         ch_r2_c1, ch_r2_c2 = st.columns(2)
         with ch_r2_c1:
-            st.plotly_chart(build_power_vs_throttle_chart(analysis), use_container_width=True)
+            st.plotly_chart(build_power_vs_throttle_chart(analysis), width="stretch")
         with ch_r2_c2:
-            st.plotly_chart(build_battery_utilisation_chart(analysis), use_container_width=True)
+            st.plotly_chart(build_battery_utilisation_chart(analysis), width="stretch")
 
-        st.plotly_chart(build_payload_tradeoff_chart(analysis), use_container_width=True)
+        st.plotly_chart(build_payload_tradeoff_chart(analysis), width="stretch")
 
     # =========================================================================
     # TAB 6: MODULE F — CONFIGURATION COMPARISON
@@ -1192,7 +1192,7 @@ def main() -> None:
                     cmp_analyses.append(evaluate_configuration(cfg_obj, ds_obj))
 
             cmp_rows = compare_configurations(cmp_analyses)
-            st.plotly_chart(build_configuration_comparison_chart(cmp_rows), use_container_width=True)
+            st.plotly_chart(build_configuration_comparison_chart(cmp_rows), width="stretch")
 
             cmp_df = pd.DataFrame(
                 [
@@ -1221,7 +1221,7 @@ def main() -> None:
                     for r in cmp_rows
                 ]
             )
-            st.dataframe(cmp_df, use_container_width=True, hide_index=True)
+            st.dataframe(cmp_df, width="stretch", hide_index=True)
 
             cmp_csv_bytes = generate_comparison_csv(cmp_rows).encode("utf-8")
             st.download_button(
@@ -1252,7 +1252,7 @@ def main() -> None:
                 data=pdf_bytes,
                 file_name=f"RotorLab_Report_{active_cfg.config_id}.pdf",
                 mime="application/pdf",
-                use_container_width=True,
+                width="stretch",
             )
         with dl2:
             st.download_button(
@@ -1260,7 +1260,7 @@ def main() -> None:
                 data=csv_curve_text.encode("utf-8"),
                 file_name=f"RotorLab_Curve_{active_cfg.config_id}.csv",
                 mime="text/csv",
-                use_container_width=True,
+                width="stretch",
             )
         with dl3:
             st.download_button(
@@ -1268,7 +1268,7 @@ def main() -> None:
                 data=md_text.encode("utf-8"),
                 file_name=f"RotorLab_Report_{active_cfg.config_id}.md",
                 mime="text/markdown",
-                use_container_width=True,
+                width="stretch",
             )
 
         with st.expander("Preview Full Engineering Report", expanded=True):

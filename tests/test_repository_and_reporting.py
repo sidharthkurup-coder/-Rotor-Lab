@@ -135,3 +135,13 @@ def test_end_to_end_analysis_comparison_and_reporting() -> None:
         assert len(fig.data) >= 2
         assert fig.layout.title.text is not None
         assert "Source:" in fig.layout.title.text or "Provenance:" in fig.layout.title.text
+
+
+def test_streamlit_workstation_apptest_smoke() -> None:
+    from pathlib import Path
+    from streamlit.testing.v1 import AppTest
+
+    app_path = Path(__file__).resolve().parent.parent / "app.py"
+    at = AppTest.from_file(str(app_path), default_timeout=30).run()
+    assert not at.exception
+    assert len(at.tabs) == 7
