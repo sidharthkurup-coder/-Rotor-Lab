@@ -1,0 +1,8 @@
+# T-Motor U3 KV700 with 11x3.7 CF Propeller at 14.8V (4S) - Example Static Bench Test CSV
+throttle_pct,voltage_v,current_a,thrust_gf,power_w,rpm
+40,14.8,1.9,340,28.12,4200
+50,14.8,3.1,490,45.88,5100
+65,14.8,5.9,760,87.32,6400
+75,14.8,8.4,970,124.32,7400
+85,14.8,11.5,1210,170.20,8100
+100,14.8,14.2,1430,210.16,8750

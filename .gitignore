@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Pytest & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local runtime SQLite instances (seed templates are in rotorlab/data/)
+*.db
+*.sqlite
+*.sqlite3
+
+# OS & IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temporary exports
+tmp/
+*.tmp
