@@ -1,74 +1,147 @@
-# ROTORLAB 1.0
-**Professional UAV Propulsion Analysis and Configuration Platform**
+# ROTORLAB 1.0 // AI-Powered UAV Propulsion Engineering Platform
 
-RotorLab is a deterministic aerospace propulsion configuration, hover equilibrium, electrical power, compatibility, and trade-study workstation for multirotor UAVs. Built in Python with Streamlit, NumPy, Plotly, SQLite, and FPDF2, it translates multirotor propulsion engineering principles into a rigorous, interactive analysis environment.
-
----
-
-## Key Engineering Capabilities (Modules A–H)
-
-- **Module A — Propulsion Configuration**: Define multirotor topologies (`X4`, `X6`, `X8`, coaxial), BLDC motor ratings, propeller geometry, ESC current/cell ratings, battery packs, avionics loads, and ISA altitude/temperature conditions. Supports unit selection (`kg`/`g`/`lb`, `inch`/`mm`, `mAh`/`Ah`) and full SQLite persistence (Save, Load, Duplicate, Delete).
-- **Module B — Empirical Thrust & Aerodynamic Analysis**: Evaluates single-motor and total propulsion thrust, hover equilibrium throttle/current/RPM, rotor disk loading ($\text{kg/m}^2$ and $\text{N/m}^2$), actuator-disk induced velocity ($v_i$), electro-propulsive Figure of Merit ($FM$), and $N-1$ motor-out thrust ratios. Enforces strict data provenance (`Manufacturer Measurements`, `User-Supplied Measurements`, `Illustrative Synthetic Data`, `Calculated Estimate`) and warns on any out-of-bounds extrapolation.
-- **Module C — Electrical Power & Endurance Analysis**: Dimensionally consistent calculation of nominal/usable battery energy ($\text{Wh}$), system current draw (motors + avionics), ohmic voltage sag, stator copper loss ($I^2 R$), continuous/burst C-rate utilization, and estimated flight endurance across Hover, Operating, and Peak regimes.
-- **Module D — Thrust-to-Weight Analysis**: Evaluates $\text{TWR} = T_{\text{total}}\,[\text{N}] / W_{\text{aircraft}}\,[\text{N}]$ in strict SI units ($g_0 = 9.80665\text{ m/s}^2$), available thrust margin, and payload limits at both target design TWR and static lift ceiling ($\text{TWR} = 1.0$).
-- **Module E — Component Compatibility & Safety Margins**: Evaluates ESC continuous current safety factor, motor current/power thermal limits, battery continuous/burst discharge capability, series cell-count ($S$) voltage matching, and dataset parameter alignment with detailed engineering explanations.
-- **Module F — Multi-Configuration Trade Study Comparison**: Side-by-side tabular and graphical comparison of saved multirotor configurations with CSV export.
-- **Module G — Interactive Engineering Visualisations**: Dark-themed Plotly aerospace charts with explicit units, operating markers, and data-source provenance footers (Thrust vs. Throttle, Current vs. Throttle, Power & Efficacy vs. Throttle, Battery Utilisation & Endurance, and Parametric Payload-Endurance Tradeoff Envelope).
-- **Module H — Downloadable Engineering Reports**: Exports complete PDF engineering dossiers (`fpdf2`), Markdown technical reports, and CSV performance curves.
+RotorLab is an AI-powered aerospace propulsion analysis, configuration, and trade-study platform for multirotor UAVs. Combining deterministic aerodynamic and electrical solvers with Google Gemini reasoning, RotorLab enables engineers to design, analyze, compare, and optimize multirotor aircraft using both an interactive 5-step engineering workstation and a conversational AI Copilot.
 
 ---
 
-## Project Architecture
+## 🌟 Key Capabilities
+
+### 1. 🤖 Google Gemini AI Copilot with Grounded Function Calling
+- **Zero Hallucination Engineering**: The AI Copilot uses Google's official `google-genai` Python SDK with native function calling. Every numerical statistic (thrust, TWR, hover throttle %, power, flight endurance, voltage sag, component margins) is computed directly by RotorLab's verified math solvers.
+- **Context-Aware Follow-Ups**: Maintains conversation history and active aircraft context across turns.
+- **Integrated Tool Execution**: Calls 9 deterministic engineering functions:
+  - `run_propulsion_analysis()`: Complete thrust, electrical, and compatibility evaluation.
+  - `calculate_thrust_to_weight()`: Static thrust, AUW, TWR, and agility standards.
+  - `calculate_hover_throttle()`: Equilibrium hover throttle percentage and per-rotor power.
+  - `calculate_battery_endurance()`: Hover and cruise flight times under Peukert and DoD reserve limits.
+  - `check_component_compatibility()`: ESC continuous/peak headroom, motor thermal limits, and battery C-rate margins.
+  - `compare_aircraft_configurations()`: Multi-UAV parametric comparison matrix.
+  - `analyse_motor_failure()`: Degraded static thrust ($N-1$) and aerodynamic attitude controllability.
+  - `retrieve_component_specifications()`: Component search across motors, props, ESCs, and batteries.
+  - `create_or_modify_aircraft_configuration()`: Assembles, validates, and saves new UAV configurations directly into the database.
+
+### 2. ➕ Dynamic Aircraft Configuration Builder
+- **Beyond Fixed Presets**: Predefined configurations (Surveyor, Valkyrie, Atlas, Tactical) serve as optional reference presets.
+- **Custom UAV Creation**: Build any multirotor architecture from scratch (Quadcopters $X4$, Hexacopters $X6$, Octocopters $X8$, Coaxial $X8$, or custom configurations).
+- Specify custom mass budgets, payload requirements, operating throttle targets, BLDC motor specs, propeller geometries, ESC ratings, and battery packs.
+- Full SQLite persistence: Create, edit, duplicate, save, and delete custom configurations.
+
+### 3. 📑 PDF Datasheet Intelligence
+- Upload manufacturer specification sheets (PDF or image).
+- Gemini multimodal document understanding automatically extracts motor parameters ($KV$, $I_{\max}$, $P_{\max}$, internal resistance, mass), propeller dimensions, ESC limits, and static bench test curves.
+- **Human-in-the-Loop Review**: Extracted specifications are presented in an editable review card with confidence ratings (`HIGH`, `MEDIUM`, `LOW`) and ambiguity notes before committing to the database.
+
+### 4. 📦 Dynamic Component Database & Provenance Tracking
+- Dedicated inventory catalog for BLDC motors, propellers, ESCs, and flight batteries.
+- Strict data provenance tagging: `Manufacturer Measurements`, `User-Supplied Measurements`, `Calculated Estimate`, and `Illustrative Synthetic Data`.
+- **Bulk CSV Import & Export**: Import multiple components via CSV with downloadable templates, or export the catalog.
+
+### 5. 🛠️ 5-Step Engineering Workstation (100% Offline Capable)
+- **Step 0 — Overview Dashboard**: Executive KPI bar ($TWR$, hover throttle, battery utilization, endurance) and compatibility badge.
+- **Step 1 & 2 — Configure Aircraft & Propulsion**: Parametric specification inputs, mass budget, and component selection.
+- **Step 3 — Performance Analysis**: Dark-themed Plotly charts for Thrust vs. Throttle, Electrical Power & Efficacy, Current Draw, and Payload Tradeoff Sweeps.
+- **Step 4 — Compare Configurations**: Side-by-side trade-study comparison table with CSV export.
+- **Step 5 — Generate Engineering Reports**: One-click export of formal PDF engineering dossiers (`fpdf2`), Markdown technical briefs, and raw CSV curves.
+
+---
+
+## 🔑 Google Gemini API Configuration
+
+RotorLab supports three simple ways to supply your Gemini API key:
+
+### Option A: Local `.env` File (Recommended for Local Development)
+Create a `.env` file in the project root directory (a template is provided in `.env.example`):
+```bash
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+### Option B: System Environment Variable
+Set the environment variable in your terminal:
+```powershell
+$env:GEMINI_API_KEY="your_gemini_api_key_here"
+```
+
+### Option C: In-App Sidebar or Copilot Card
+Enter your API key directly inside the RotorLab user interface. The key is stored in session memory only and is never written to disk or git.
+
+> [!NOTE]
+> **Graceful Degradation**: RotorLab remains 100% operational offline without an API key. The entire 5-step Engineering Workspace, custom aircraft builder, chart visualization, and PDF generation work locally without internet access.
+
+---
+
+## 🚀 Quickstart & Local Execution
+
+### One-Click Launch (Windows 11)
+Double-click `run_rotorlab.bat` in the project root folder. It initializes the virtual environment on first launch and opens http://localhost:8501 in your browser.
+
+### Manual Setup
+1. **Navigate to the project directory**:
+   ```powershell
+   cd "C:\Users\Sidharth V Kurup\.gemini\antigravity\scratch\RotorLab"
+   ```
+
+2. **Activate the virtual environment & install dependencies**:
+   ```powershell
+   .\.venv\Scripts\Activate.ps1
+   pip install -r requirements.txt
+   ```
+
+3. **Run the automated test suite**:
+   ```powershell
+   pytest -v
+   ```
+
+4. **Launch the Streamlit Platform**:
+   ```powershell
+   streamlit run app.py --server.port 8501
+   ```
+   Open **http://localhost:8501** in your browser.
+
+---
+
+## 📁 Architecture Overview
 
 ```text
 RotorLab/
-├── app.py                              # Streamlit engineering workstation UI
-├── requirements.txt                    # Locked Python dependencies
+├── app.py                              # Streamlit platform entrypoint & view router
+├── requirements.txt                    # Python dependencies (google-genai, streamlit, plotly, etc.)
+├── .env.example                        # Template for API credentials
+├── .gitignore                          # Excludes .env, virtualenvs, and SQLite databases
 ├── rotorlab/
-│   ├── models/
-│   │   ├── domain.py                   # Validated dataclasses & provenance enums
-│   │   └── units.py                    # SI unit conversions & ISA atmosphere model
-│   ├── engine/
-│   │   ├── thrust.py                   # Thrust interpolation, hover solver & actuator disk
-│   │   ├── electrical.py               # Battery energy, power, sag & endurance engine
-│   │   └── compatibility.py            # Configurable engineering margin evaluator
+│   ├── ai/                             # AI Copilot & GenAI integration
+│   │   ├── client.py                   # Official google-genai Client & model config
+│   │   ├── tools.py                    # 9 deterministic engineering tools for Gemini
+│   │   ├── copilot.py                  # Grounded AI Copilot agent loop
+│   │   └── datasheet.py                # Gemini multimodal PDF datasheet parser
 │   ├── data/
-│   │   ├── datasets.py                 # T-Motor manufacturer & synthetic datasets + CSV parser
-│   │   └── repository.py               # SQLite persistence repository
-│   ├── services/
-│   │   └── analyzer.py                 # Single-config orchestration, sweeps & comparison
+│   │   ├── datasets.py                 # Factory datasets and CSV performance curves
+│   │   └── repository.py               # SQLite persistence (aircraft, components, datasets)
+│   ├── engine/
+│   │   ├── thrust.py                   # Momentum theory, hover equilibrium & actuator disk
+│   │   ├── electrical.py               # Battery energy, voltage sag & endurance engine
+│   │   └── compatibility.py            # Safety margins, ESC headroom & thermal checks
+│   ├── models/
+│   │   ├── domain.py                   # Strongly-typed domain models & provenance enums
+│   │   └── units.py                    # SI conversions & ISA atmosphere model
 │   ├── reporting/
-│   │   └── exporter.py                 # PDF, CSV, and Markdown report generators
+│   │   └── exporter.py                 # PDF dossier, Markdown brief, and CSV generators
+│   ├── services/
+│   │   └── analyzer.py                 # Multi-config orchestration and sweeps
 │   └── ui/
-│       └── charts.py                   # Interactive Plotly engineering charts
-├── datasets/                           # Sample CSV thrust-stand datasets for import
-├── docs/
-│   └── ENGINEERING_REFERENCE.md        # Mathematical derivations & limitations
-└── tests/                              # Automated Pytest QA suite
+│       ├── builder_view.py             # Custom aircraft configuration builder dialog
+│       ├── copilot_view.py             # AI Copilot conversational UI & datasheet review
+│       ├── catalog_view.py             # Dynamic component database & CSV bulk tools
+│       └── charts.py                   # Plotly interactive engineering visualisations
+└── tests/                              # Pytest test suite (32 unit & integration tests)
 ```
 
 ---
 
-## Quickstart & Local Execution (Windows 11)
+## 🧪 Verification & Testing
 
-**Fastest:** double-click `run_rotorlab.bat` (or run its full path from any terminal). It creates the virtual environment on first use and launches the app at http://localhost:8501.
-
-**Manual steps** (commands must be run from inside the RotorLab folder):
-
-1. **Activate the virtual environment** (or create one if setting up fresh):
-   ```powershell
-   cd "C:\Users\Sidharth V Kurup\.gemini\antigravity\scratch\RotorLab"
-   python -m venv .venv
-   .\.venv\Scripts\pip.exe install -r requirements.txt
-   ```
-
-2. **Run the automated test suite**:
-   ```powershell
-   .\.venv\Scripts\pytest.exe -v
-   ```
-
-3. **Launch the RotorLab Streamlit Workstation**:
-   ```powershell
-   .\.venv\Scripts\streamlit.exe run app.py --server.port 8501
-   ```
-   Open **http://localhost:8501** in your browser.
+Every single engineering tool and math routine is covered by automated unit tests:
+```powershell
+pytest
+```
+*Current test suite: 32 tests passing across engine calculations, units, models, repository persistence, AI tools, and graceful degradation.*

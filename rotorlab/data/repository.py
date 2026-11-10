@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import csv
 import dataclasses
+import io
 import json
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -36,6 +39,7 @@ class RotorLabRepository:
             self._persistent_conn = sqlite3.connect(":memory:", check_same_thread=False)
         self._init_schema()
         self.ensure_builtin_presets()
+        self.ensure_default_components()
 
     def _get_conn(self) -> sqlite3.Connection:
         if self._is_memory and self._persistent_conn is not None:
@@ -67,6 +71,20 @@ class RotorLabRepository:
                         dataset_id TEXT PRIMARY KEY,
                         motor_manufacturer TEXT NOT NULL,
                         motor_model TEXT NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS components (
+                        component_id TEXT PRIMARY KEY,
+                        component_type TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        manufacturer TEXT NOT NULL,
+                        provenance TEXT NOT NULL,
+                        source_reference TEXT NOT NULL,
                         payload_json TEXT NOT NULL,
                         created_at TEXT NOT NULL
                     )
@@ -289,3 +307,284 @@ class RotorLabRepository:
             if ds.dataset_id == dataset_id:
                 return ds
         return None
+
+    def ensure_default_components(self) -> None:
+        """Seed default components from factory reference configurations if catalog is empty."""
+        conn = self._get_conn()
+        try:
+            cursor = conn.execute("SELECT count(*) FROM components")
+            count = cursor.fetchone()[0]
+        finally:
+            self._close_conn(conn)
+
+        if count > 0:
+            return
+
+        for cfg in get_default_configurations():
+            # Seed motor
+            motor_id = f"cmp_motor_{re.sub(r'[^a-zA-Z0-9_]', '_', cfg.motor.model.lower())}"
+            self.save_component(
+                component_type="motor",
+                spec=cfg.motor,
+                provenance=DataProvenance.MANUFACTURER_DATASHEET,
+                source_reference=f"Reference Preset: {cfg.name}",
+                component_id=motor_id,
+            )
+            # Seed propeller
+            prop_id = f"cmp_prop_{re.sub(r'[^a-zA-Z0-9_]', '_', cfg.propeller.model.lower())}_{cfg.propeller.code.replace('x', '_')}"
+            self.save_component(
+                component_type="propeller",
+                spec=cfg.propeller,
+                provenance=DataProvenance.MANUFACTURER_DATASHEET,
+                source_reference=f"Reference Preset: {cfg.name}",
+                component_id=prop_id,
+            )
+            # Seed ESC
+            esc_id = f"cmp_esc_{re.sub(r'[^a-zA-Z0-9_]', '_', cfg.esc.name.lower())}"
+            self.save_component(
+                component_type="esc",
+                spec=cfg.esc,
+                provenance=DataProvenance.MANUFACTURER_DATASHEET,
+                source_reference=f"Reference Preset: {cfg.name}",
+                component_id=esc_id,
+            )
+            # Seed Battery
+            bat_id = f"cmp_bat_{re.sub(r'[^a-zA-Z0-9_]', '_', cfg.battery.name.lower())}"
+            self.save_component(
+                component_type="battery",
+                spec=cfg.battery,
+                provenance=DataProvenance.MANUFACTURER_DATASHEET,
+                source_reference=f"Reference Preset: {cfg.name}",
+                component_id=bat_id,
+            )
+
+    def save_component(
+        self,
+        component_type: str,
+        spec: Any,
+        provenance: DataProvenance | str = DataProvenance.USER_MEASURED,
+        source_reference: str = "",
+        component_id: Optional[str] = None,
+    ) -> str:
+        """Persist a component in SQLite with full provenance tracking."""
+        prov_val = provenance.value if isinstance(provenance, DataProvenance) else str(provenance)
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        if dataclasses.is_dataclass(spec):
+            spec_dict = dataclasses.asdict(spec)
+        elif isinstance(spec, dict):
+            spec_dict = dict(spec)
+        else:
+            raise ValueError(f"Unsupported component spec type: {type(spec)}")
+
+        ctype = component_type.lower().strip()
+        if ctype == "motor":
+            mfg = spec_dict.get("manufacturer", "Generic")
+            mdl = spec_dict.get("model", "Motor")
+            name = f"{mfg} {mdl} (KV{int(round(float(spec_dict.get('kv_rating', 0))))})"
+        elif ctype == "propeller":
+            mfg = spec_dict.get("manufacturer", "Generic")
+            mdl = spec_dict.get("model", "Propeller")
+            dia = spec_dict.get("diameter_in", 0)
+            pit = spec_dict.get("pitch_in", 0)
+            name = f"{mfg} {mdl} ({dia}x{pit}\")"
+        elif ctype == "esc":
+            name = spec_dict.get("name", "Electronic Speed Controller")
+            mfg = name.split()[0] if name else "Generic"
+        elif ctype == "battery":
+            name = spec_dict.get("name", "LiPo Battery")
+            mfg = name.split()[0] if name else "Generic"
+        else:
+            name = spec_dict.get("name", f"Component {ctype}")
+            mfg = spec_dict.get("manufacturer", "Generic")
+
+        cid = component_id or f"cmp_{ctype}_{uuid.uuid4().hex[:8]}"
+        payload = json.dumps(spec_dict)
+
+        conn = self._get_conn()
+        try:
+            with conn:
+                conn.execute(
+                    """
+                    INSERT INTO components (component_id, component_type, name, manufacturer, provenance, source_reference, payload_json, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(component_id) DO UPDATE SET
+                        component_type = excluded.component_type,
+                        name = excluded.name,
+                        manufacturer = excluded.manufacturer,
+                        provenance = excluded.provenance,
+                        source_reference = excluded.source_reference,
+                        payload_json = excluded.payload_json,
+                        created_at = excluded.created_at
+                    """,
+                    (cid, ctype, name, mfg, prov_val, source_reference, payload, now_iso),
+                )
+        finally:
+            self._close_conn(conn)
+        return cid
+
+    def list_components(self, component_type: Optional[str] = None) -> List[dict]:
+        """List stored components, optionally filtered by type ('motor', 'propeller', 'esc', 'battery')."""
+        conn = self._get_conn()
+        try:
+            if component_type:
+                cursor = conn.execute(
+                    "SELECT component_id, component_type, name, manufacturer, provenance, source_reference, payload_json, created_at FROM components WHERE component_type = ? ORDER BY rowid ASC",
+                    (component_type.lower().strip(),),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT component_id, component_type, name, manufacturer, provenance, source_reference, payload_json, created_at FROM components ORDER BY rowid ASC"
+                )
+            rows = cursor.fetchall()
+        finally:
+            self._close_conn(conn)
+
+        results = []
+        for r in rows:
+            results.append(
+                {
+                    "component_id": r[0],
+                    "component_type": r[1],
+                    "name": r[2],
+                    "manufacturer": r[3],
+                    "provenance": r[4],
+                    "source_reference": r[5],
+                    "spec": json.loads(r[6]),
+                    "created_at": r[7],
+                }
+            )
+        return results
+
+    def get_component(self, component_id: str) -> Optional[dict]:
+        """Retrieve a single component record by ID."""
+        conn = self._get_conn()
+        try:
+            cursor = conn.execute(
+                "SELECT component_id, component_type, name, manufacturer, provenance, source_reference, payload_json, created_at FROM components WHERE component_id = ?",
+                (component_id,),
+            )
+            r = cursor.fetchone()
+        finally:
+            self._close_conn(conn)
+        if not r:
+            return None
+        return {
+            "component_id": r[0],
+            "component_type": r[1],
+            "name": r[2],
+            "manufacturer": r[3],
+            "provenance": r[4],
+            "source_reference": r[5],
+            "spec": json.loads(r[6]),
+            "created_at": r[7],
+        }
+
+    def delete_component(self, component_id: str) -> bool:
+        """Delete a component by ID from the catalog."""
+        conn = self._get_conn()
+        try:
+            with conn:
+                cursor = conn.execute(
+                    "DELETE FROM components WHERE component_id = ?",
+                    (component_id,),
+                )
+                deleted = cursor.rowcount > 0
+        finally:
+            self._close_conn(conn)
+        return deleted
+
+    def import_components_csv(
+        self,
+        csv_text: str,
+        component_type: str,
+        provenance: DataProvenance | str = DataProvenance.USER_MEASURED,
+        source_reference: str = "CSV Import",
+    ) -> int:
+        """Parse CSV content and import components of the specified type."""
+        reader = csv.DictReader(io.StringIO(csv_text.strip()))
+        imported = 0
+        ctype = component_type.lower().strip()
+
+        for row in reader:
+            clean_row = {k.strip(): v.strip() for k, v in row.items() if k and v}
+            if not clean_row:
+                continue
+
+            if ctype == "motor":
+                spec = MotorSpec(
+                    manufacturer=clean_row["manufacturer"],
+                    model=clean_row["model"],
+                    kv_rating=float(clean_row["kv_rating"]),
+                    max_continuous_current_a=float(clean_row["max_continuous_current_a"]),
+                    max_continuous_power_w=float(clean_row["max_continuous_power_w"]),
+                    internal_resistance_mohm=float(clean_row.get("internal_resistance_mohm", 100.0)),
+                    no_load_current_a=float(clean_row.get("no_load_current_a", 0.5)),
+                    min_cells_s=int(clean_row.get("min_cells_s", 3)),
+                    max_cells_s=int(clean_row.get("max_cells_s", 6)),
+                    mass_g=float(clean_row.get("mass_g", 100.0)),
+                )
+            elif ctype == "propeller":
+                spec = PropellerSpec(
+                    manufacturer=clean_row.get("manufacturer", "Generic"),
+                    model=clean_row["model"],
+                    diameter_in=float(clean_row["diameter_in"]),
+                    pitch_in=float(clean_row["pitch_in"]),
+                    num_blades=int(clean_row.get("num_blades", 2)),
+                    material=clean_row.get("material", "Carbon Fiber (CF)"),
+                    mass_g=float(clean_row.get("mass_g", 18.0)),
+                )
+            elif ctype == "esc":
+                spec = ESCSpec(
+                    name=clean_row["name"],
+                    continuous_current_a=float(clean_row["continuous_current_a"]),
+                    peak_current_a=float(clean_row["peak_current_a"]),
+                    min_cells_s=int(clean_row.get("min_cells_s", 3)),
+                    max_cells_s=int(clean_row.get("max_cells_s", 6)),
+                    mass_g=float(clean_row.get("mass_g", 25.0)),
+                )
+            elif ctype == "battery":
+                spec = BatterySpec(
+                    name=clean_row["name"],
+                    cell_count_s=int(clean_row["cell_count_s"]),
+                    nominal_voltage_v=float(clean_row["nominal_voltage_v"]),
+                    operating_voltage_v=float(clean_row.get("operating_voltage_v", clean_row["nominal_voltage_v"])),
+                    capacity_mah=float(clean_row["capacity_mah"]),
+                    continuous_c_rating=float(clean_row["continuous_c_rating"]),
+                    burst_c_rating=float(clean_row.get("burst_c_rating", float(clean_row["continuous_c_rating"]) * 1.5)),
+                    usable_capacity_fraction=float(clean_row.get("usable_capacity_fraction", 0.80)),
+                    internal_resistance_per_cell_mohm=float(clean_row.get("internal_resistance_per_cell_mohm", 4.0)),
+                    mass_g=float(clean_row.get("mass_g", 500.0)),
+                )
+            else:
+                raise ValueError(f"Unknown component type '{ctype}' for CSV import.")
+
+            self.save_component(ctype, spec, provenance=provenance, source_reference=source_reference)
+            imported += 1
+
+        return imported
+
+    def export_components_csv(self, component_type: str) -> str:
+        """Export components of a given type as a CSV string."""
+        components = self.list_components(component_type)
+        if not components:
+            return ""
+        all_keys = set()
+        for c in components:
+            all_keys.update(c["spec"].keys())
+        fieldnames = ["component_id", "name", "manufacturer", "provenance", "source_reference"] + sorted(list(all_keys))
+
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        for c in components:
+            row = {
+                "component_id": c["component_id"],
+                "name": c["name"],
+                "manufacturer": c["manufacturer"],
+                "provenance": c["provenance"],
+                "source_reference": c["source_reference"],
+            }
+            row.update(c["spec"])
+            writer.writerow(row)
+        return output.getvalue()

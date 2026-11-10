@@ -6,13 +6,15 @@ All mathematical calculations are strictly delegated to `rotorlab.engine` and `r
 
 from __future__ import annotations
 
+import os
 import uuid
 from typing import List
 
 import pandas as pd
 import streamlit as st
 
-from rotorlab.data.datasets import parse_csv_performance_dataset
+from rotorlab.ai.client import get_gemini_model_name, has_gemini_api_key
+from rotorlab.data.datasets import get_default_configurations, parse_csv_performance_dataset
 from rotorlab.data.repository import RotorLabRepository
 from rotorlab.engine.thrust import interpolate_at_throttle
 from rotorlab.models.domain import (
@@ -47,13 +49,16 @@ from rotorlab.services.analyzer import (
     compare_configurations,
     evaluate_configuration,
 )
-from rotorlab.ui.charts import (
+from rotorlab.ui import (
     build_battery_utilisation_chart,
     build_configuration_comparison_chart,
     build_current_vs_throttle_chart,
     build_payload_tradeoff_chart,
     build_power_vs_throttle_chart,
     build_thrust_vs_throttle_chart,
+    render_catalog_view,
+    render_copilot_view,
+    render_new_aircraft_dialog,
 )
 
 st.set_page_config(
@@ -419,10 +424,31 @@ def main() -> None:
     # =========================================================================
     with st.sidebar:
         st.markdown("### 🛸 ROTORLAB 1.0")
-        st.caption("Aerospace UAV Propulsion Analysis & Configuration Workstation")
+        st.caption("AI-Powered UAV Propulsion Engineering Platform")
         st.divider()
 
-        st.markdown("#### Saved Configurations")
+        st.markdown("#### 🧭 Platform View")
+        view_options = [
+            "🛠️ Engineering Workspace",
+            "🤖 RotorLab AI Copilot",
+            "📦 Component & Dataset Catalog",
+        ]
+        default_idx = (
+            view_options.index(st.session_state["current_platform_view"])
+            if "current_platform_view" in st.session_state and st.session_state["current_platform_view"] in view_options
+            else 0
+        )
+        platform_view = st.radio(
+            "Select View",
+            options=view_options,
+            index=default_idx,
+            key="platform_mode_radio",
+            label_visibility="collapsed",
+        )
+        st.session_state["current_platform_view"] = platform_view
+        st.divider()
+
+        st.markdown("#### Aircraft Configurations")
         config_options = {c.config_id: f"{c.name}" for c in all_configs}
         selected_cfg_id = st.selectbox(
             "Active Aircraft Architecture",
@@ -438,6 +464,9 @@ def main() -> None:
         active_cfg = repo.get_configuration(st.session_state["active_config_id"])
         if active_cfg is None:
             active_cfg = all_configs[0]
+
+        if st.button("➕ Create Custom Aircraft", width="stretch", type="primary", help="Build a brand new custom UAV configuration with custom architecture and components"):
+            render_new_aircraft_dialog(repo)
 
         col_s1, col_s2 = st.columns(2)
         with col_s1:
@@ -472,6 +501,20 @@ def main() -> None:
             st.toast("All 4 factory reference presets restored!")
             st.rerun()
 
+        with st.expander("🤖 Gemini AI Copilot Status", expanded=False):
+            key_set = has_gemini_api_key(st.session_state.get("gemini_api_key"))
+            if key_set:
+                st.success(f"● Connected ({get_gemini_model_name()})")
+            else:
+                st.info("API Key Not Configured")
+            api_k_input = st.text_input("Gemini API Key", type="password", key="sidebar_gemini_key", placeholder="AIzaSy...")
+            if st.button("Update Key", key="btn_update_key", width="stretch"):
+                if api_k_input.strip():
+                    st.session_state["gemini_api_key"] = api_k_input.strip()
+                    os.environ["GEMINI_API_KEY"] = api_k_input.strip()
+                    st.toast("API key saved for this session!")
+                    st.rerun()
+
         with st.expander("⚙️ Measurement Units", expanded=False):
             st.caption("Choose your preferred display and input units. Internal equations always execute in SI.")
             mass_unit = st.selectbox("Mass Unit", ["kg", "g", "lb"], index=0)
@@ -497,6 +540,15 @@ def main() -> None:
     tr = analysis.thrust
     el = analysis.electrical
     cp = analysis.compatibility
+
+    # Route based on selected platform view
+    if platform_view == "🤖 RotorLab AI Copilot":
+        render_copilot_view(repo, active_cfg, active_ds, analysis)
+        return
+
+    if platform_view == "📦 Component & Dataset Catalog":
+        render_catalog_view(repo, active_cfg)
+        return
 
     # =========================================================================
     # WORKSTATION HEADER & ESSENTIAL 4-KPI EXECUTIVE BAR
